@@ -36,7 +36,7 @@ GCC_FLAGS = [
 
 # Tuned Genetic Algorithm Parameters from the paper
 POPULATION_SIZE = 277
-MAX_GENERATIONS = 5
+MAX_GENERATIONS = 10
 ELITISM_RATIO = 0.147
 MUTATION_PROB = 0.287
 CROSSOVER_PROB = 0.120
@@ -220,7 +220,7 @@ class FOGA:
             avg_fitness = float('inf')
             
         print(f"Gen {generation+1:3d} | Valid: {valid_count:3d}/{POPULATION_SIZE} | "
-              f"Best: {self.best_individual.fitness:.4f}s | Avg: {avg_fitness:.4f}s")
+              f"Best: {self.best_individual.fitness:.8f}s | Avg: {avg_fitness:.4f}s")
 
     def run(self):
         """Executes the main GA loop."""
@@ -284,6 +284,40 @@ class FOGA:
             print("\n\n⚠ Optimization interrupted by user!")
         
         self.print_results()
+
+    def _get_optimization_flags(self, level):
+        """Gets the flags enabled by a specific optimization level using compiler query."""
+        temp_file = f"temp_query_{os.getpid()}.c"
+        
+        # Create a minimal source file
+        with open(temp_file, 'w') as f:
+            f.write("int main() { return 0; }")
+        
+        try:
+            # Use -Q --help=optimizers to get enabled flags
+            result = subprocess.run(
+                f"{self.compiler} {level} -Q --help=optimizers",
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            enabled_flags = []
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    line = line.strip()
+                    if line.startswith('-f') and '[enabled]' in line:
+                        flag = line.split()[0]
+                        enabled_flags.append(flag)
+            
+            return enabled_flags
+            
+        except Exception as e:
+            return []
+        finally:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
         
     def _benchmark_and_compare(self):
         """Benchmarks standard GCC/G++ optimization levels and compares with FOGA's result."""
@@ -362,6 +396,66 @@ class FOGA:
         foga_improvement_str = calc_improvement(o3_time, foga_time)
         print(f"| {'FOGA (Best)':<15} | {foga_time_str:<20} | {foga_improvement_str:<22} |")
         print("="*60)
+        
+        # Display flags comparison
+        self._print_flags_comparison()
+
+    def _print_flags_comparison(self):
+        """Prints a detailed comparison of flags used in each optimization level."""
+        print("\n" + "="*80)
+        print("🚩 OPTIMIZATION FLAGS COMPARISON")
+        print("="*80)
+        
+        print("\nQuerying compiler for optimization flags...")
+        
+        # Get flags for each level
+        o1_flags = set(self._get_optimization_flags('-O1'))
+        o2_flags = set(self._get_optimization_flags('-O2'))
+        o3_flags = set(self._get_optimization_flags('-O3'))
+        foga_flags = set([GCC_FLAGS[i] for i, gene in enumerate(self.best_individual.chromosome) if gene == 1])
+        
+        print(f"\n📊 Flag Count Summary:")
+        print(f"  -O1:        {len(o1_flags)} flags enabled")
+        print(f"  -O2:        {len(o2_flags)} flags enabled")
+        print(f"  -O3:        {len(o3_flags)} flags enabled")
+        print(f"  FOGA:       {len(foga_flags)} flags enabled")
+        
+        # Find unique flags
+        all_flags = o1_flags | o2_flags | o3_flags | foga_flags
+        
+        print(f"\n📋 Detailed Flag Breakdown:")
+        print("-"*80)
+        print(f"{'Flag':<45} | {'O1':<5} | {'O2':<5} | {'O3':<5} | {'FOGA':<5}")
+        print("-"*80)
+        
+        # Sort flags alphabetically for easier reading
+        for flag in sorted(all_flags):
+            o1_mark = "✓" if flag in o1_flags else "✗"
+            o2_mark = "✓" if flag in o2_flags else "✗"
+            o3_mark = "✓" if flag in o3_flags else "✗"
+            foga_mark = "✓" if flag in foga_flags else "✗"
+            
+            print(f"{flag:<45} | {o1_mark:^5} | {o2_mark:^5} | {o3_mark:^5} | {foga_mark:^5}")
+        
+        print("-"*80)
+        
+        # Show FOGA-unique flags
+        foga_unique = foga_flags - o3_flags
+        o3_missing = o3_flags - foga_flags
+        
+        if foga_unique:
+            print(f"\n✨ FOGA-Specific Flags (not in -O3): {len(foga_unique)}")
+            for i, flag in enumerate(sorted(foga_unique), 1):
+                print(f"  {i:2d}. {flag}")
+        else:
+            print(f"\n✨ FOGA-Specific Flags: None (FOGA uses a subset of -O3)")
+        
+        if o3_missing:
+            print(f"\n🔍 -O3 Flags Excluded by FOGA: {len(o3_missing)}")
+            for i, flag in enumerate(sorted(o3_missing), 1):
+                print(f"  {i:2d}. {flag}")
+        
+        print("\n" + "="*80)
 
     def print_results(self):
         """Prints the final optimization results."""
@@ -392,7 +486,7 @@ class FOGA:
             else:
                 print("⚠ Failed to create optimized binary")
 
-            # NEW: Add the comparison table at the end
+            # Add the comparison table at the end
             self._benchmark_and_compare()
                 
         else:
