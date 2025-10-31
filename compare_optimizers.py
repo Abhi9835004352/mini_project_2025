@@ -277,13 +277,13 @@ class OptimizerComparison:
         print(f"FOGA Improvement over -O3: {foga_improvement:+.2f}%")
         print(f"HBRF Improvement over -O3: {hbrf_improvement:+.2f}%")
 
-        if foga_evals > 0 and hbrf_evals > 0:
-            eval_ratio = foga_evals / hbrf_evals
-            print(f"\nHBRF used {eval_ratio:.2f}x fewer evaluations than FOGA")
+        # if foga_evals > 0 and hbrf_evals > 0:
+        #     eval_ratio = foga_evals / hbrf_evals
+        #     print(f"\nHBRF used {eval_ratio:.2f}x fewer evaluations than FOGA")
 
-        if foga_time > 0 and hbrf_time > 0:
-            time_ratio = foga_time / hbrf_time
-            print(f"HBRF was {time_ratio:.2f}x faster in optimization time")
+        # if foga_time > 0 and hbrf_time > 0:
+        #     time_ratio = foga_time / hbrf_time
+        #     print(f"HBRF was {time_ratio:.2f}x faster in optimization time")
 
         print("\n4️⃣  WINNER ANALYSIS")
         print("-" * 80)
@@ -306,10 +306,10 @@ class OptimizerComparison:
             print(f"🤝 RESULT: TIE")
             print(f"   Both methods achieved the same execution time")
 
-        if hbrf_time < foga_time:
-            time_saved = foga_time - hbrf_time
-            print(f"\n⚡ HBRF saved {time_saved:.2f}s in optimization time")
-            print(f"   ({((foga_time - hbrf_time) / foga_time * 100):.1f}% faster)")
+        # if hbrf_time < foga_time:
+        #     time_saved = foga_time - hbrf_time
+        #     print(f"\n⚡ HBRF saved {time_saved:.2f}s in optimization time")
+        #     print(f"   ({((foga_time - hbrf_time) / foga_time * 100):.1f}% faster)")
 
         comparison_data = {
             'timestamp': datetime.now().isoformat(),
