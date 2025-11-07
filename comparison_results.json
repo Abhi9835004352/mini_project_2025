@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-11-07T09:26:46.689639",
+  "source_file": "matrix_multiply.c",
+  "baseline": {
+    "-O1": 0.0024535655975341797,
+    "-O2": 0.0025293827056884766,
+    "-O3": 0.0028154850006103516
+  },
+  "FOGA": {
+    "best_time": 0.00214,
+    "total_time": 193.49371218681335,
+    "evaluations": 10
+  },
+  "HBRF": {
+    "best_time": 0.002208709716796875,
+    "total_time": 32.98000884056091,
+    "evaluations": 170
+  },
+  "winner": "FOGA",
+  "improvements": {
+    "FOGA_vs_O3": 23.991781183842832,
+    "HBRF_vs_O3": 21.551359132864764
+  }
+}

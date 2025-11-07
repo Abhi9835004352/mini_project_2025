@@ -341,28 +341,53 @@ class OptimizerComparison:
     def generate_visualizations(self, times_dict, foga_opt_time, hbrf_opt_time):
         """Generate comparison charts"""
         try:
-            fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+            fig, axes = plt.subplots(2, 2, figsize=(14, 12))
 
+            # Execution Time Comparison
             methods = list(times_dict.keys())
             times = [times_dict[m] if times_dict[m] != float('inf') else 0 for m in methods]
             colors = ['#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6']
 
-            axes[0].bar(methods, times, color=colors)
-            axes[0].set_ylabel('Execution Time (seconds)')
-            axes[0].set_title('Execution Time Comparison')
-            axes[0].grid(axis='y', alpha=0.3)
+            axes[0, 0].bar(methods, times, color=colors)
+            axes[0, 0].set_ylabel('Execution Time (seconds)')
+            axes[0, 0].set_title('Execution Time Comparison')
+            axes[0, 0].grid(axis='y', alpha=0.3)
 
+            # Optimization Time Comparison
             opt_methods = ['FOGA', 'HBRF']
             opt_times = [foga_opt_time, hbrf_opt_time]
 
-            axes[1].bar(opt_methods, opt_times, color=['#e74c3c', '#9b59b6'])
-            axes[1].set_ylabel('Optimization Time (seconds)')
-            axes[1].set_title('Optimization Time Comparison')
-            axes[1].grid(axis='y', alpha=0.3)
+            axes[0, 1].bar(opt_methods, opt_times, color=['#e74c3c', '#9b59b6'])
+            axes[0, 1].set_ylabel('Optimization Time (seconds)')
+            axes[0, 1].set_title('Optimization Time Comparison')
+            axes[0, 1].grid(axis='y', alpha=0.3)
+
+            # Percentage Improvements Over -O3
+            o3_time = times_dict.get('-O3', float('inf'))
+            improvements = {
+                'FOGA': ((o3_time - times_dict['FOGA']) / o3_time) * 100 if o3_time != float('inf') else 0,
+                'HBRF': ((o3_time - times_dict['HBRF']) / o3_time) * 100 if o3_time != float('inf') else 0
+            }
+
+            axes[1, 0].bar(improvements.keys(), improvements.values(), color=['#e74c3c', '#9b59b6'])
+            axes[1, 0].set_ylabel('Improvement (%)')
+            axes[1, 0].set_title('Percentage Improvement Over -O3')
+            axes[1, 0].grid(axis='y', alpha=0.3)
+
+            # Evaluations Per Second
+            foga_evals = self.results['FOGA'].get('evaluations', 0)
+            hbrf_evals = self.results['HBRF'].get('evaluations', 0)
+            foga_eps = foga_evals / foga_opt_time if foga_opt_time > 0 else 0
+            hbrf_eps = hbrf_evals / hbrf_opt_time if hbrf_opt_time > 0 else 0
+
+            axes[1, 1].bar(['FOGA', 'HBRF'], [foga_eps, hbrf_eps], color=['#e74c3c', '#9b59b6'])
+            axes[1, 1].set_ylabel('Evaluations Per Second')
+            axes[1, 1].set_title('Evaluation Efficiency')
+            axes[1, 1].grid(axis='y', alpha=0.3)
 
             plt.tight_layout()
-            plt.savefig('comparison_chart.png', dpi=150, bbox_inches='tight')
-            print("📊 Visualization saved to: comparison_chart.png")
+            plt.savefig('enhanced_comparison_chart.png', dpi=150, bbox_inches='tight')
+            print("📊 Enhanced visualization saved to: enhanced_comparison_chart.png")
 
         except Exception as e:
             print(f"⚠ Could not generate visualizations: {e}")

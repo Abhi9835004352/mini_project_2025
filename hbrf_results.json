@@ -1,0 +1,41 @@
+{
+  "best_time": 0.002208709716796875,
+  "total_optimization_time": 31.997814178466797,
+  "total_evaluations": 170,
+  "enabled_flags": [
+    "-fassociative-math",
+    "-fcode-hoisting",
+    "-fcse-follow-jumps",
+    "-fdce",
+    "-fdefer-pop",
+    "-fipa-cp",
+    "-fmove-loop-invariants",
+    "-fshrink-wrap",
+    "-fsplit-wide-types",
+    "-fstrict-aliasing",
+    "-ftree-forwprop",
+    "-fvar-tracking-assignments"
+  ],
+  "flag_importance": {
+    "-fcode-hoisting": 0.05769213378993668,
+    "-fbranch-probabilities": 0.056403813828321665,
+    "-fvar-tracking-assignments": 0.029505672789640607,
+    "-ftree-slp-vectorize": 0.028493666562483123,
+    "-fwrapv": 0.025439825026312386,
+    "-fstrict-aliasing": 0.02488515322482661,
+    "-ftree-forwprop": 0.02400847250816828,
+    "-fdefer-pop": 0.022903221701098996,
+    "-fconserve-stack": 0.021213243001059392,
+    "-fshrink-wrap": 0.020538490965330652,
+    "-fipa-cp": 0.019026778838056868,
+    "-fsplit-wide-types": 0.0186563508534839,
+    "-ftree-ch": 0.018542197087051255,
+    "-funroll-all-loops": 0.01783667240193389,
+    "-falign-labels": 0.01738692827022852,
+    "-fdce": 0.015097481461943755,
+    "-fmove-loop-invariants": 0.014437039201193857,
+    "-fassociative-math": 0.014105375189535063,
+    "-fcse-follow-jumps": 0.013671339591865264,
+    "-fsched-interblock": 0.013546881900143734
+  }
+}
