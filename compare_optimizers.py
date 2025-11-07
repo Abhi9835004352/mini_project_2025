@@ -206,6 +206,66 @@ class OptimizerComparison:
             print(f"❌ HBRF failed: {e}")
             return float('inf'), 0
 
+    def run_xgboost(self):
+        """Run XGBoost-based optimizer"""
+        print("\n" + "=" * 80)
+        print("⚡ RUNNING XGBOOST OPTIMIZER")
+        print("=" * 80)
+
+        cmd = ['python3', '-u', 'xgboost_optimizer.py', self.source_file]
+        if self.test_input_file:
+            cmd.append(self.test_input_file)
+
+        start_time = time.time()
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+
+            output_lines = []
+            for line in process.stdout:
+                line = line.rstrip()
+                print(line, flush=True)
+                output_lines.append(line)
+
+            process.wait(timeout=3600)
+            total_time = time.time() - start_time
+            output = "\n".join(output_lines)
+
+            best_time = float('inf')
+            evaluations = 0
+
+            if os.path.exists('xgboost_results.json'):
+                try:
+                    with open('xgboost_results.json', 'r') as f:
+                        xgb_data = json.load(f)
+                        best_time = xgb_data.get('best_time', best_time)
+                        evaluations = xgb_data.get('total_evaluations', evaluations)
+                except Exception as e:
+                    print(f"Warning: could not read xgboost_results.json: {e}")
+
+            self.results['XGBOOST'] = {
+                'best_time': best_time,
+                'total_time': total_time,
+                'evaluations': evaluations,
+                'output': output
+            }
+
+            print(f"\n✅ XGBOOST Complete: {best_time:.6f}s in {total_time:.2f}s")
+            return best_time, total_time
+
+        except subprocess.TimeoutExpired:
+            process.kill()
+            print("❌ XGBOOST timed out after 1 hour")
+            return float('inf'), 3600
+        except Exception as e:
+            print(f"❌ XGBOOST failed: {e}")
+            return float('inf'), 0
+
     def generate_comparison_report(self):
         """Generate comprehensive comparison report"""
         print("\n" + "=" * 80)
@@ -215,6 +275,7 @@ class OptimizerComparison:
         baseline = self.results['baseline']
         foga = self.results['FOGA']
         hbrf = self.results['HBRF']
+        xgboost = self.results['XGBOOST']
 
         print("\n1️⃣  EXECUTION TIME COMPARISON")
         print("-" * 80)
@@ -228,7 +289,8 @@ class OptimizerComparison:
             '-O2': baseline.get('-O2', float('inf')),
             '-O3': o3_time,
             'FOGA': foga.get('best_time', float('inf')),
-            'HBRF': hbrf.get('best_time', float('inf'))
+            'HBRF': hbrf.get('best_time', float('inf')),
+            'XGBOOST': xgboost.get('best_time', float('inf'))
         }
 
         ranked = sorted(times_dict.items(), key=lambda x: x[1])
@@ -252,14 +314,18 @@ class OptimizerComparison:
 
         foga_time = foga.get('total_time', 0)
         hbrf_time = hbrf.get('total_time', 0)
+        xgb_time = xgboost.get('total_time', 0)
         foga_evals = foga.get('evaluations', 0)
         hbrf_evals = hbrf.get('evaluations', 0)
+        xgb_evals = xgboost.get('evaluations', 0)
 
         foga_eps = foga_evals / foga_time if foga_time > 0 else 0
         hbrf_eps = hbrf_evals / hbrf_time if hbrf_time > 0 else 0
+        xgb_eps = xgb_evals / xgb_time if xgb_time > 0 else 0
 
         print(f"{'FOGA':<20} | {foga_time:<15.2f} | {foga_evals:<15} | {foga_eps:<10.2f}")
         print(f"{'HBRF':<20} | {hbrf_time:<15.2f} | {hbrf_evals:<15} | {hbrf_eps:<10.2f}")
+        print(f"{'XGBOOST':<20} | {xgb_time:<15.2f} | {xgb_evals:<15} | {xgb_eps:<10.2f}")
 
         print("\n3️⃣  EFFICIENCY METRICS")
         print("-" * 80)
@@ -274,42 +340,37 @@ class OptimizerComparison:
         else:
             hbrf_improvement = 0
 
+        if xgboost.get('best_time', float('inf')) != float('inf') and o3_time != float('inf'):
+            xgb_improvement = ((o3_time - xgboost['best_time']) / o3_time) * 100
+        else:
+            xgb_improvement = 0
+
         print(f"FOGA Improvement over -O3: {foga_improvement:+.2f}%")
         print(f"HBRF Improvement over -O3: {hbrf_improvement:+.2f}%")
-
-        # if foga_evals > 0 and hbrf_evals > 0:
-        #     eval_ratio = foga_evals / hbrf_evals
-        #     print(f"\nHBRF used {eval_ratio:.2f}x fewer evaluations than FOGA")
-
-        # if foga_time > 0 and hbrf_time > 0:
-        #     time_ratio = foga_time / hbrf_time
-        #     print(f"HBRF was {time_ratio:.2f}x faster in optimization time")
+        print(f"XGBOOST Improvement over -O3: {xgb_improvement:+.2f}%")
 
         print("\n4️⃣  WINNER ANALYSIS")
         print("-" * 80)
 
         foga_best = foga.get('best_time', float('inf'))
         hbrf_best = hbrf.get('best_time', float('inf'))
+        xgb_best = xgboost.get('best_time', float('inf'))
 
-        if foga_best < hbrf_best:
-            winner = "FOGA"
-            margin = ((hbrf_best - foga_best) / hbrf_best) * 100
-            print(f"🏆 WINNER: FOGA")
-            print(f"   FOGA achieved {margin:.2f}% better execution time")
-        elif hbrf_best < foga_best:
-            winner = "HBRF"
-            margin = ((foga_best - hbrf_best) / foga_best) * 100
-            print(f"🏆 WINNER: HBRF")
-            print(f"   HBRF achieved {margin:.2f}% better execution time")
+        # determine winner among available results
+        bests = {'FOGA': foga_best, 'HBRF': hbrf_best, 'XGBOOST': xgb_best}
+        sorted_bests = sorted(bests.items(), key=lambda x: x[1])
+        winner_name, winner_time = sorted_bests[0]
+
+        if winner_time == float('inf'):
+            winner = "NONE"
+            print("No successful optimizations found")
         else:
-            winner = "TIE"
-            print(f"🤝 RESULT: TIE")
-            print(f"   Both methods achieved the same execution time")
-
-        # if hbrf_time < foga_time:
-        #     time_saved = foga_time - hbrf_time
-        #     print(f"\n⚡ HBRF saved {time_saved:.2f}s in optimization time")
-        #     print(f"   ({((foga_time - hbrf_time) / foga_time * 100):.1f}% faster)")
+            winner = winner_name
+            print(f"🏆 WINNER: {winner}")
+            # compute margin against second best if available
+            if len(sorted_bests) > 1 and sorted_bests[1][1] != float('inf') and sorted_bests[1][1] > 0:
+                margin = ((sorted_bests[1][1] - winner_time) / sorted_bests[1][1]) * 100
+                print(f"   {winner} achieved {margin:.2f}% better execution time vs second best")
 
         comparison_data = {
             'timestamp': datetime.now().isoformat(),
@@ -325,10 +386,16 @@ class OptimizerComparison:
                 'total_time': hbrf_time,
                 'evaluations': hbrf_evals
             },
+            'XGBOOST': {
+                'best_time': xgb_best,
+                'total_time': xgb_time,
+                'evaluations': xgb_evals
+            },
             'winner': winner,
             'improvements': {
                 'FOGA_vs_O3': foga_improvement,
-                'HBRF_vs_O3': hbrf_improvement
+                'HBRF_vs_O3': hbrf_improvement,
+                'XGBOOST_vs_O3': xgb_improvement
             }
         }
 
@@ -336,9 +403,9 @@ class OptimizerComparison:
             json.dump(comparison_data, f, indent=2)
 
         print("\n📄 Comparison results saved to: comparison_results.json")
-        self.generate_visualizations(times_dict, foga_time, hbrf_time)
+        self.generate_visualizations(times_dict, foga_time, hbrf_time, xgb_time)
 
-    def generate_visualizations(self, times_dict, foga_opt_time, hbrf_opt_time):
+    def generate_visualizations(self, times_dict, foga_opt_time, hbrf_opt_time, xgb_opt_time):
         """Generate comparison charts"""
         try:
             fig, axes = plt.subplots(2, 2, figsize=(14, 12))
@@ -346,7 +413,9 @@ class OptimizerComparison:
             # Execution Time Comparison
             methods = list(times_dict.keys())
             times = [times_dict[m] if times_dict[m] != float('inf') else 0 for m in methods]
-            colors = ['#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6']
+            # extend color palette to accommodate extra method
+            base_colors = ['#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c']
+            colors = base_colors[:len(methods)]
 
             axes[0, 0].bar(methods, times, color=colors)
             axes[0, 0].set_ylabel('Execution Time (seconds)')
@@ -354,22 +423,22 @@ class OptimizerComparison:
             axes[0, 0].grid(axis='y', alpha=0.3)
 
             # Optimization Time Comparison
-            opt_methods = ['FOGA', 'HBRF']
-            opt_times = [foga_opt_time, hbrf_opt_time]
+            opt_methods = ['FOGA', 'HBRF', 'XGBOOST']
+            opt_times = [foga_opt_time, hbrf_opt_time, xgb_opt_time]
 
-            axes[0, 1].bar(opt_methods, opt_times, color=['#e74c3c', '#9b59b6'])
+            axes[0, 1].bar(opt_methods, opt_times, color=['#e74c3c', '#9b59b6', '#1abc9c'])
             axes[0, 1].set_ylabel('Optimization Time (seconds)')
             axes[0, 1].set_title('Optimization Time Comparison')
             axes[0, 1].grid(axis='y', alpha=0.3)
 
             # Percentage Improvements Over -O3
             o3_time = times_dict.get('-O3', float('inf'))
-            improvements = {
-                'FOGA': ((o3_time - times_dict['FOGA']) / o3_time) * 100 if o3_time != float('inf') else 0,
-                'HBRF': ((o3_time - times_dict['HBRF']) / o3_time) * 100 if o3_time != float('inf') else 0
-            }
+            improvements = {}
+            for key in ['FOGA', 'HBRF', 'XGBOOST']:
+                val = times_dict.get(key, float('inf'))
+                improvements[key] = ((o3_time - val) / o3_time) * 100 if o3_time != float('inf') and val != float('inf') else 0
 
-            axes[1, 0].bar(improvements.keys(), improvements.values(), color=['#e74c3c', '#9b59b6'])
+            axes[1, 0].bar(list(improvements.keys()), list(improvements.values()), color=['#e74c3c', '#9b59b6', '#1abc9c'])
             axes[1, 0].set_ylabel('Improvement (%)')
             axes[1, 0].set_title('Percentage Improvement Over -O3')
             axes[1, 0].grid(axis='y', alpha=0.3)
@@ -377,10 +446,12 @@ class OptimizerComparison:
             # Evaluations Per Second
             foga_evals = self.results['FOGA'].get('evaluations', 0)
             hbrf_evals = self.results['HBRF'].get('evaluations', 0)
+            xgb_evals = self.results['XGBOOST'].get('evaluations', 0)
             foga_eps = foga_evals / foga_opt_time if foga_opt_time > 0 else 0
             hbrf_eps = hbrf_evals / hbrf_opt_time if hbrf_opt_time > 0 else 0
+            xgb_eps = xgb_evals / xgb_opt_time if xgb_opt_time > 0 else 0
 
-            axes[1, 1].bar(['FOGA', 'HBRF'], [foga_eps, hbrf_eps], color=['#e74c3c', '#9b59b6'])
+            axes[1, 1].bar(['FOGA', 'HBRF', 'XGBOOST'], [foga_eps, hbrf_eps, xgb_eps], color=['#e74c3c', '#9b59b6', '#1abc9c'])
             axes[1, 1].set_ylabel('Evaluations Per Second')
             axes[1, 1].set_title('Evaluation Efficiency')
             axes[1, 1].grid(axis='y', alpha=0.3)
@@ -404,6 +475,7 @@ class OptimizerComparison:
         self.run_baseline_benchmarks()
         self.run_foga()
         self.run_hbrf()
+        self.run_xgboost()
         self.generate_comparison_report()
 
         print("\n" + "=" * 80)
